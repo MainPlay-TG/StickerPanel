@@ -8,6 +8,25 @@ class PackButton(QToolButton):
       print(pack["name"])
     self.clicked.connect(on_click)
     self.setIcon(pack["icon"])
+    self.setIconSize(QSize(50,50))
+class PackPanel(QScrollArea):
+  def __init__(self,parent:QWidget):
+    QScrollArea.__init__(self,parent)
+    layout=QGridLayout()
+    widget=QWidget()
+    widget.setFixedSize(QSize(50*len(cache),50))
+    widget.setLayout(layout)
+    self.setFixedSize(800,50)
+    self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+    self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+    self.setWidgetResizable(True)
+    self.setWidget(widget)
+    column=0
+    for pack_id,pack in cache.items():
+      pack["icon"]=QIcon(pack["stickers"][0]["sticker"].path)
+      btn=PackButton(pack,self)
+      layout.addWidget(btn,0,column)
+      column+=1
 class MainWindow(QMainWindow):
   def __init__(self):
     QMainWindow.__init__(self)
@@ -18,15 +37,7 @@ class MainWindow(QMainWindow):
     cw.setLayout(layout)
     self.setCentralWidget(cw)
     load_stickers()
-    pack_bar=QToolBar(self)
-    pack_bar.setFixedSize(800,50)
-    pack_bar.setAllowedAreas(Qt.ToolBarArea.TopToolBarArea)
-    pack_bar.setMovable(False)
-    pack_bar.setIconSize(QSize(50,50))
-    for pack_id,pack in cache.items():
-      pack["icon"]=QIcon(pack["stickers"][0]["sticker"].path)
-      btn=PackButton(pack,pack_bar)
-      pack_bar.addWidget(btn)
+    pack_bar=PackPanel(self)
 if __name__=="__main__":
   app=QApplication(sys.argv)
   mw=MainWindow()

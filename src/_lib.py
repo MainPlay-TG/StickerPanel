@@ -34,7 +34,7 @@ else:
 def load_stickers():
   cache.clear()
   dir=cfg["stickers.dir"]
-  tmp_dir=mps.dir.localdata+"/sticker_cache"
+  tmp_dir=mps.dir.localdata+"/sticker_cache/{}x{}".format(*TARGET_SIZE)
   ms.dir.create(dir)
   ms.dir.create(tmp_dir)
   for pack in ms.dir.list(dir,type="dir"):
@@ -62,7 +62,7 @@ def load_stickers():
                 pos=0,int((TARGET_SIZE[1]-size[1])/2)
               if img.size[0]<img.size[1]:
                 size=int(TARGET_SIZE[0]*(img.size[0]/img.size[1])),TARGET_SIZE[1]
-                pos=int((TARGET_SIZE[0]-size[0]))/2,0
+                pos=int((TARGET_SIZE[0]-size[0])/2),0
               nimg=Image.new("RGBA",TARGET_SIZE,(0,0,0,0))
               nimg.paste(img.resize(size),pos) # type: ignore
               nimg.save(item["sticker"].path)
