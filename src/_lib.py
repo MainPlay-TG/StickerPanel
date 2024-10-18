@@ -1,7 +1,7 @@
 """_lib.py"""
 import atexit
-import sys
 import natsort
+import sys
 from hashlib import sha256
 from MainPlaySoft import MPSoft
 from MainPlaySoft.lang import texts as LANG_TEXTS
@@ -74,6 +74,7 @@ def load_stickers():
     if len(stickers)>0:
       cache[pack.full_name]={}
       cache[pack.full_name]["name"]=pack.full_name
+      cache[pack.full_name]["path"]=pack
       cache[pack.full_name]["stickers"]=natsort.os_sorted(stickers,key=lambda i:i["path"].base_name)
       cache[pack.full_name]["url"]=None
       if ms.path.exists(pack.path+"/info.json"):
