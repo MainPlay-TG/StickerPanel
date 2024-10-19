@@ -2,6 +2,7 @@
 from PyQt5.QtWidgets import QWidget
 from _lib import *
 ICONS={}
+IMAGES={}
 MAIN_WIN_SIZE=QSize(800,600)
 PACK_BTN_SIZE=QSize(50,50)
 STICKER_SIZE=QSize(100,100)
@@ -9,12 +10,30 @@ STICKERS_IN_ROW=MAIN_WIN_SIZE.width()//STICKER_SIZE.width()
 class StickerButton(QPushButton):
   def __init__(self,sticker:dict,parent:QWidget):
     QPushButton.__init__(self,parent)
+    self.sticker=sticker
     imgpath=sticker["sticker"].path
     self.setFixedSize(STICKER_SIZE)
     self.setIconSize(STICKER_SIZE)
     if not imgpath in ICONS:
       ICONS[imgpath]=QIcon(imgpath)
     self.setIcon(ICONS[imgpath])
+  def mousePressEvent(self,event:QMouseEvent):
+    imgpath=self.sticker["sticker"].path
+    if not imgpath in IMAGES:
+      IMAGES[imgpath]=QImage(imgpath)
+    if event.button()==Qt.MouseButton.RightButton:
+      cb=QApplication.clipboard()
+      cb.setImage(IMAGES[imgpath])
+  def mouseMoveEvent(self,event:QMouseEvent):
+    img=IMAGES[self.sticker["sticker"].path]
+    drag=QDrag(self)
+    mime=QMimeData()
+    mime.setImageData(img)
+    # pixmap=QPixmap()
+    # pixmap.convertFromImage(img)
+    drag.setMimeData(mime)
+    # drag.setPixmap(pixmap)
+    drag.exec(Qt.DropAction.CopyAction)
 class PackButton(QPushButton):
   STICKER_PANEL:QScrollArea=None
   def __init__(self,pack_id:str,pack:dict,parent:QWidget):
@@ -45,6 +64,7 @@ class PackButton(QPushButton):
     self.setFixedSize(PACK_BTN_SIZE)
     self.setIcon(pack["icon"])
     self.setIconSize(PACK_BTN_SIZE)
+    gc.collect()
 class PackPanel(QScrollArea):
   def __init__(self,parent:QWidget):
     QScrollArea.__init__(self,parent)

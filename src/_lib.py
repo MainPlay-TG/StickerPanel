@@ -1,5 +1,5 @@
 """_lib.py"""
-import atexit
+import gc
 import natsort
 import sys
 from hashlib import sha256
