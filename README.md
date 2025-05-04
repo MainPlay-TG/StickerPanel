@@ -2,7 +2,7 @@
 Разработчик: [MainPlay TG](https://t.me/MainPlay_TG)
 ## Описание
 StickerPanel - панель локальных стикеров для ПК. Вы можете скачать любые стикер-паки и поместить их в папку данных программы, запустить программу, выбрать нужный набор и мышкой перетащить стикер в другое приложение
-![](.github/media/demo.mp4)
+![](https://github.com/MainPlay-TG/StickerPanel/raw/refs/heads/master/.github/media/demo.mp4)
 ## Совместимость
 StickerPanel совместим с многими мессенджерами. Протестирован в Telegram Desktop и Discord
 ## Инструкция
