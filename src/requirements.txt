@@ -1,0 +1,4 @@
+MainPlaySoft>=0.0.2
+MainShortcuts2>=2.4.14
+pillow>=11.2.1
+PyQt6>=6.9.0
