@@ -99,6 +99,8 @@ class Sticker:
     return QIcon(self.get_cache(size))
   def get_qimage(self,size):
     return QImage(self.get_cache(size))
+  def get_qpixmap(self,size):
+    return QPixmap(self.get_cache(size))
 def load_stickers(dir:str)->list[Pack]:
   dir=ms.path.Path(dir)
   ms.dir.create(CACHE_DIR)

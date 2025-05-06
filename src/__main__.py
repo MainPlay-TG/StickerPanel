@@ -7,22 +7,25 @@ PACK_BTN_SIZE=QSize(50,50)
 STICKER_SIZE=QSize(100,100)
 STICKERS_IN_ROW=MAIN_WIN_SIZE.width()//STICKER_SIZE.width()
 class StickerButton(QPushButton):
+  IMMEDIATELY_CACHE="--immediately-cache" in sys.argv
   def __init__(self,sticker:Sticker,parent:QWidget):
     QPushButton.__init__(self,parent)
     self.setFixedSize(STICKER_SIZE)
     self.setIcon(sticker.get_qicon(STICKER_SIZE))
     self.setIconSize(STICKER_SIZE)
     self.sticker=sticker
+    if self.IMMEDIATELY_CACHE:
+      self.sticker.get_cache(TARGET_SIZE)
   def mousePressEvent(self,event:QMouseEvent):
     if event.button()==Qt.MouseButton.RightButton:
       cb=QApplication.clipboard()
       cb.setImage(self.sticker.get_qimage(TARGET_SIZE))
   def mouseMoveEvent(self,event:QMouseEvent):
     drag=QDrag(self)
-    img=self.sticker.get_qimage(TARGET_SIZE)
     mime=QMimeData()
-    mime.setImageData(img)
+    mime.setImageData(self.sticker.get_qimage(TARGET_SIZE))
     drag.setMimeData(mime)
+    drag.setPixmap(self.sticker.get_qpixmap(STICKER_SIZE))
     drag.exec(Qt.DropAction.CopyAction)
 class PackButton(QPushButton):
   STICKER_PANEL:QScrollArea=None
@@ -43,6 +46,7 @@ class PackButton(QPushButton):
       panel.setFixedHeight(STICKER_SIZE.height()*size_y)
       panel.setFixedWidth(STICKER_SIZE.width()*size_x)
       panel.setLayout(layout)
+      STICKER_PANEL.setWidget(panel)
       x,y=0,0
       for sticker in pack.stickers:
         try:
@@ -56,7 +60,6 @@ class PackButton(QPushButton):
           y+=1
         layout.addWidget(btn,y,x)
         x+=1
-      STICKER_PANEL.setWidget(panel)
       gc.collect()
     self.clicked.connect(on_click)
     self.setFixedSize(PACK_BTN_SIZE)
@@ -98,21 +101,25 @@ class StickerPanel(QScrollArea):
 class MainWindow(QMainWindow):
   def __init__(self):
     QMainWindow.__init__(self)
+    self.setFixedSize(MAIN_WIN_SIZE)
+    self.show()
+    self.setWindowTitle("StickerPanel от MainPlay TG")
     layout=QGridLayout(self)
     layout.setContentsMargins(0,0,0,0)
     layout.setSpacing(0)
     cw=QWidget(self)
     cw.setLayout(layout)
     self.setCentralWidget(cw)
-    self.setFixedSize(MAIN_WIN_SIZE)
-    self.setWindowTitle("StickerPanel от MainPlay TG")
     sticker_panel=StickerPanel(self)
     PackButton.STICKER_PANEL=sticker_panel
     layout.addWidget(PackPanel(load_stickers(cfg["stickers.dir"]),self),0,0)
     layout.addWidget(sticker_panel,1,0)
-    self.show()
 @ms.utils.main_func(__name__)
 def main():
+  if "--clear-cache" in sys.argv:
+    log("Deleting cache...")
+    for i in ms.dir.list_iter(CACHE_DIR):
+      i.delete()
   app=QApplication(sys.argv)
   mw=MainWindow()
   return app.exec()
