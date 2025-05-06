@@ -1,37 +1,22 @@
-"""_lib.py"""
-import gc
-import natsort
 import sys
 from hashlib import sha256
 from MainPlaySoft import MPSoft
-from MainPlaySoft.lang import texts as LANG_TEXTS
 from MainShortcuts2 import ms
 from PIL import Image
 from PyQt6.QtCore import *
 from PyQt6.QtGui import *
 from PyQt6.QtWidgets import *
-from traceback import print_exc
-cache={}
+try:
+  import natsort
+except Exception:
+  natsort=None
 mps=MPSoft("MainPlay TG","StickerPanel")
 cfg=ms.cfg(mps.dir.data+"/cfg.json",type="json")
-# cfg.default["sticker.format"]="WEBP"
-cfg.default["lang.code"]="ru"
 cfg.default["sticker.size"]=[512,512]
 cfg.default["stickers.dir"]=mps.dir.data+"/stickers"
 cfg.dload(True)
-LANG_DEFAULT={"window/title":"StickerPanel от MainPlay TG","init/lang_not_found":"Предупреждение: языковой файл не найден"}
-for k,v in LANG_DEFAULT.items():
-  LANG_TEXTS["ru"][k]=v
-lang=mps.lang
-lang.code=cfg["lang.code"]
-TARGET_EXT=".png"
-#TARGET_EXT="."+cfg["sticker.format"].lower()
+CACHE_DIR=mps.dir.localdata+"/sticker_cache/"
 TARGET_SIZE=cfg["sticker.size"][0],cfg["sticker.size"][1]
-if ms.path.exists(ms.MAIN_DIR+"/lang/"+lang.code+".json"):
-  for k,v in ms.json.read(ms.MAIN_DIR+"/lang/"+lang.code+".json").items():
-    lang[k]=v
-else:
-  print(lang["init/lang_not_found"],file=sys.stderr)
 def log(text:str,*values,**kw):
   kw.setdefault("file",sys.stderr)
   if len(values)==0:
@@ -39,60 +24,91 @@ def log(text:str,*values,**kw):
   if len(values)==1:
     values=values[0]
   print(text%values,**kw)
-def resize_img(img:Image.Image)->Image.Image:
-  if img.size==TARGET_SIZE:
+def resize_img(img:Image.Image,size:tuple[int,int],**kw)->Image.Image:
+  if img.size==size:
     return img
   if img.size[0]==img.size[1]:
-    return img.resize(TARGET_SIZE)
-  size,pos=None,None
+    kw["size"]=size
+    return img.resize(**kw)
+  nimg=Image.new("RGBA",size,(0,0,0,0))
+  pos=None
   if img.size[0]>img.size[1]:
-    size=TARGET_SIZE[0],int(TARGET_SIZE[1]*(img.size[1]/img.size[0]))
-    pos=0,int((TARGET_SIZE[1]-size[1])/2)
+    kw["size"]=size[0],int(size[1]*(img.size[1]/img.size[0]))
+    pos=0,int((size[1]-kw["size"][1])/2)
   if img.size[0]<img.size[1]:
-    size=int(TARGET_SIZE[0]*(img.size[0]/img.size[1])),TARGET_SIZE[1]
-    pos=int((TARGET_SIZE[0]-size[0])/2),0
-  nimg=Image.new("RGBA",TARGET_SIZE,(0,0,0,0))
-  nimg.paste(img.resize(size),pos)
+    kw["size"]=int(size[0]*(img.size[0]/img.size[1])),size[1]
+    pos=int((size[0]-kw["size"][0])/2),0
+  nimg.paste(img.resize(**kw),pos)
   return nimg
-def load_stickers():
-  cache.clear()
-  dir=cfg["stickers.dir"]
-  tmp_dir=mps.dir.localdata+"/sticker_cache/{}x{}".format(*TARGET_SIZE)
-  ms.dir.create(dir)
-  ms.dir.create(tmp_dir)
-  for pack in ms.dir.list_iter(dir,type="dir"):
-    stickers=[]
-    for sticker in ms.dir.list_iter(pack,exts=Image.registered_extensions().keys(),type="file"):
-      sticker_name=pack.full_name+"/"+sticker.full_name
-      try:
-        item={}
-        item["path"]=sticker
+def os_sorted(paths,**kw):
+  kw.setdefault("key",lambda i:i.full_name)
+  if natsort is None:
+    return sorted(paths,**kw)
+  return natsort.os_sorted(paths,**kw)
+class Pack:
+  def __init__(self,dir:str):
+    self.dir=ms.path.Path(dir)
+    self.name=self.dir.full_name
+    self.stickers:list[Sticker]=[]
+    self.url:None=None
+    if ms.path.exists(self.dir.path+"/info.json"):
+      info=ms.json.read(self.dir.path+"/info.json")
+      if info.get("name"):
+        self.name=info["name"]
+      if info.get("title"):
+        self.name=info["title"]
+      if info.get("url"):
+        self.url:str=info["url"]
+    for file in os_sorted(ms.dir.list_iter(self.dir,exts=list(Image.registered_extensions()),type="file")):
+      sticker=Sticker(self,file)
+      self.stickers.append(sticker)
+  def __bool__(self):
+    return len(self.stickers)>0
+  def __str__(self):
+    return self.name
+  @property
+  def icon(self):
+    return self.stickers[0]
+class Sticker:
+  def __init__(self,pack:Pack,file:str):
+    self._sha256=None
+    self.file=ms.path.Path(file)
+    self.name=self.file.base_name
+    self.pack=pack
+  def __str__(self):
+    return "%s/%s"%(self.pack.name,self.name)
+  @property
+  def sha256(self)->str:
+    if self._sha256 is None:
+      with open(self.file,"rb") as f:
         hash=sha256()
-        with open(sticker.path,"rb") as f:
-          for chunk in f:
-            hash.update(chunk)
-        item["sha256"]=hash.digest()
-        item["sticker"]=ms.path.Path(tmp_dir+"/"+hash.hexdigest()+TARGET_EXT)
-        if not ms.path.exists(item["sticker"]):
-          log('Caching "%s"',sticker_name)
-          with Image.open(sticker.path) as img:
-            with resize_img(img) as nimg:
-              nimg.save(item["sticker"].path,compress_level=0)
-        stickers.append(item)
-      except Exception as err:
-        log('Error on loading "%s"',sticker_name)
-        print_exc()
-    if len(stickers)>0:
-      cache[pack.full_name]={}
-      cache[pack.full_name]["name"]=pack.full_name
-      cache[pack.full_name]["path"]=pack
-      cache[pack.full_name]["stickers"]=natsort.os_sorted(stickers,key=lambda i:i["path"].base_name)
-      cache[pack.full_name]["url"]=None
-      if ms.path.exists(pack.path+"/info.json"):
-        info=ms.json.read(pack.path+"/info.json")
-        if "name" in info:
-          cache[pack.full_name]["name"]=info["name"]
-        if "title" in info:
-          cache[pack.full_name]["name"]=info["title"]
-        if "url" in info:
-          cache[pack.full_name]["url"]=info["url"]
+        for i in f:
+          hash.update(i)
+      self._sha256=hash.hexdigest()
+    return self._sha256
+  def get_cache(self,size:tuple[int,int]|QSize):
+    if isinstance(size,QSize):
+      size=size.width(),size.height()
+    path=CACHE_DIR+"%s_%sx%s.png"%(self.sha256,*size)
+    if not ms.path.exists(path):
+      log("Caching %s for size %sx%s",self,*size)
+      with Image.open(self.file.path) as img:
+        resize_img(img,size).save(path,"PNG",compress_level=0)
+    return path
+  def get_qicon(self,size):
+    return QIcon(self.get_cache(size))
+  def get_qimage(self,size):
+    return QImage(self.get_cache(size))
+def load_stickers(dir:str)->list[Pack]:
+  dir=ms.path.Path(dir)
+  ms.dir.create(CACHE_DIR)
+  ms.dir.create(dir)
+  packs=[]
+  for pack_dir in os_sorted(ms.dir.list_iter(dir,type="dir")):
+    pack=Pack(pack_dir)
+    if pack:
+      packs.append(pack)
+  return packs
+for dir in ms.dir.list_iter(CACHE_DIR,type="dir"):
+  log("Deleting old cache dir: %s",dir.full_name)
+  ms.dir.delete(dir)
