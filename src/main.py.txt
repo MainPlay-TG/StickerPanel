@@ -10,11 +10,10 @@ class App:
   def __init__(self,packs_dir:str):
     self._packs=None
     self.qapp=QApplication(sys.argv)
-    self.notify_label:None|NotifyLabel=None
     self.packs_dir=ms.path.Path(packs_dir)
-    self.sel_pack_handlers={}
-    self.selected_pack=""
     self.main_window=MainWindow(self)
+    self.notify_label:None|NotifyLabel=None
+    self.selected_pack=""
   @property
   def sticker_panel(self):
     return self.main_window.sp
@@ -27,10 +26,6 @@ class App:
     return self.qapp.exec()
   def render(self):
     self.main_window.repaint()
-  def select_pack(self,name:Pack|str,force=False):
-    if isinstance(name,Pack):
-      name=name.name
-    self.sel_pack_handlers[name](None,force=force)
   def show_notify(self,text:str,time:float=0):
     if self.notify_label is None:
       self.notify_label=NotifyLabel(self.main_window)
@@ -45,40 +40,16 @@ class StickerButton(QPushButton):
   IMMEDIATELY_CACHE="--immediately-cache" in sys.argv
   def __init__(self,sticker:Sticker,parent:QWidget):
     QPushButton.__init__(self,parent)
-    self.app:App=parent.app
-    self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
     self.setFixedSize(STICKER_SIZE)
     self.setIcon(sticker.get_qicon(STICKER_SIZE))
     self.setIconSize(STICKER_SIZE)
     self.sticker=sticker
-    @self.customContextMenuRequested.connect
-    def _(a0):
-      menu=QMenu(self)
-      act1=QAction("Копировать изображение",self)
-      act2=QAction("Убрать с панели",self)
-      act3=QAction("Удалить навсегда",self)
-      act1.triggered.connect(self.to_clipboard)
-      act2.triggered.connect(self.remove_from_panel)
-      act3.triggered.connect(self.remove_file)
-      menu.addAction(act1)
-      menu.addAction(act2)
-      menu.addAction(act3)
-      menu.exec(QCursor.pos())
     if self.IMMEDIATELY_CACHE:
       self.sticker.get_cache(TARGET_SIZE)
-  def to_clipboard(self):
-    cb=QApplication.clipboard()
-    cb.setImage(self.sticker.get_qimage(TARGET_SIZE))
-    self.app.show_notify("Изображение скопировано в буфер обмена",3)
-  def remove_from_panel(self):
-    cfg["stickers.blacklisted"].append(str(self.sticker))
-    cfg.save()
-    self.app.select_pack(self.app.selected_pack,True)
-  def remove_file(self):
-    confirm=QMessageBox.question(self,"Удалить стикер","Вы точно хотите удалить стикер с диска? Он будет безвозвратно удалён из папки",QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.No,QMessageBox.StandardButton.No)
-    if confirm==QMessageBox.StandardButton.Yes:
-      self.sticker.file.delete()
-      self.app.select_pack(self.app.selected_pack,True)
+  def mousePressEvent(self,event:QMouseEvent):
+    if event.button()==Qt.MouseButton.RightButton:
+      cb=QApplication.clipboard()
+      cb.setImage(self.sticker.get_qimage(TARGET_SIZE))
   def mouseMoveEvent(self,event:QMouseEvent):
     drag=QDrag(self)
     mime=QMimeData()
@@ -90,12 +61,9 @@ class PackButton(QPushButton):
   def __init__(self,pack:Pack,parent:"PackPanel"):
     QPushButton.__init__(self,parent)
     self.app=parent.app
-    @self.clicked.connect
-    @ms.utils.decorators.setitem(self.app.sel_pack_handlers,pack.name)
-    def _(a0,force=False):
-      if not force:
-        if pack.name==self.app.selected_pack:
-          return
+    def on_click(a0):
+      if pack.name==self.app.selected_pack:
+        return
       self.app.main_window.setWindowTitle(WINDOW_TITLE+" - "+pack.name+" (загрузка)")
       self.app.selected_pack=pack.name
       self.app.show_notify("Загрузка стикеров...")
@@ -104,7 +72,6 @@ class PackButton(QPushButton):
       layout.setContentsMargins(0,0,0,0)
       layout.setSpacing(0)
       panel=QWidget()
-      panel.app=self.app
       size_x,size_y=STICKERS_IN_ROW,len(pack.stickers)//STICKERS_IN_ROW
       if len(pack.stickers)%STICKERS_IN_ROW>0:
         size_y+=1
@@ -114,10 +81,6 @@ class PackButton(QPushButton):
       self.app.sticker_panel.setWidget(panel)
       x,y=0,0
       for sticker in pack.stickers:
-        if str(sticker) in cfg["stickers.blacklisted"]:
-          continue
-        if not ms.path.is_file(sticker.file):
-          continue
         try:
           btn=StickerButton(sticker,panel)
         except Exception:
@@ -133,6 +96,7 @@ class PackButton(QPushButton):
       self.app.hide_notify()
       gc.collect()
       self.app.main_window.setWindowTitle(WINDOW_TITLE+" - "+pack.name)
+    self.clicked.connect(on_click)
     self.setFixedSize(PACK_BTN_SIZE)
     self.setIconSize(PACK_BTN_SIZE)
     self.setIcon(pack.icon.get_qicon(PACK_BTN_SIZE))

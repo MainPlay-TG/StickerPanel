@@ -13,6 +13,7 @@ except Exception:
 mps=MPSoft("MainPlay TG","StickerPanel")
 cfg=ms.cfg(mps.dir.data+"/cfg.json",type="json")
 cfg.default["sticker.size"]=[512,512]
+cfg.default["stickers.blacklisted"]=[]
 cfg.default["stickers.dir"]=mps.dir.data+"/stickers"
 cfg.dload(True)
 CACHE_DIR=mps.dir.localdata+"/sticker_cache/"
